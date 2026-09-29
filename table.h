@@ -4,11 +4,13 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-// A string-to-string hash map. Keys and values are copied on insert, so
-// callers are free to reuse their buffers afterwards.
+// A thread-safe string-to-string hash map. Keys and values are copied on
+// insert, so callers are free to reuse their buffers afterwards.
 struct table;
 
 struct table *table_create(void);
+
+// Only call once no other thread can touch t.
 void table_destroy(struct table *t);
 
 // Inserts a new key or overwrites an existing one. Returns false only if

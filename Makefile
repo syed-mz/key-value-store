@@ -1,5 +1,5 @@
-CFLAGS   := -std=c11 -Wall -Wextra -Werror -g -O2 -D_POSIX_C_SOURCE=200809L
-LDFLAGS  :=
+CFLAGS   := -std=c11 -Wall -Wextra -Werror -g -O2 -D_POSIX_C_SOURCE=200809L -pthread
+LDFLAGS  := -pthread
 SANITIZE := -fsanitize=address,undefined -fno-omit-frame-pointer
 
 SRCS := main.c server.c table.c
@@ -22,7 +22,15 @@ table.o:  table.c table.h
 debug:
 	$(CC) $(CFLAGS) -O0 $(SANITIZE) -o kvstore-debug $(SRCS) $(LDFLAGS)
 
+test: kvstore
+	python3 test.py ./kvstore
+
+# macOS only. Runs the tests on the normal build (leaks and ASan don't mix);
+# the test fails if leaks finds anything at exit.
+leaks: kvstore
+	python3 test.py leaks --atExit -- ./kvstore
+
 clean:
 	rm -rf kvstore kvstore-debug kvstore-debug.dSYM $(OBJS)
 
-.PHONY: all debug clean
+.PHONY: all debug test leaks clean

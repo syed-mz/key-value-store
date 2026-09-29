@@ -1,5 +1,6 @@
 #include "table.h"
 
+#include <pthread.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -16,6 +17,10 @@ struct entry {
 };
 
 struct table {
+    // One lock for the whole table: every public function holds it for its
+    // entire body, so operations never interleave. See README for the
+    // trade-off versus finer-grained locking.
+    pthread_mutex_t lock;
     struct entry **buckets;
     size_t capacity; // number of buckets
     size_t count;    // number of entries
@@ -91,11 +96,13 @@ struct table *table_create(void)
         free(t);
         return NULL;
     }
+    pthread_mutex_init(&t->lock, NULL);
     t->capacity = INITIAL_CAPACITY;
     t->count = 0;
     return t;
 }
 
+// Not locked: the caller must guarantee no other thread still uses t.
 void table_destroy(struct table *t)
 {
     for (size_t i = 0; i < t->capacity; i++) {
@@ -106,11 +113,16 @@ void table_destroy(struct table *t)
             e = next;
         }
     }
+    pthread_mutex_destroy(&t->lock);
     free(t->buckets);
     free(t);
 }
 
-bool table_set(struct table *t, const char *key, const char *value)
+// The *_locked functions are the single-threaded logic; they assume the
+// caller holds t->lock. Keeping locking in thin wrappers makes it obvious
+// that every path through the table is protected.
+
+static bool set_locked(struct table *t, const char *key, const char *value)
 {
     // Allocate before touching the table so a failure leaves it unchanged.
     char *v = strdup(value);
@@ -144,7 +156,8 @@ bool table_set(struct table *t, const char *key, const char *value)
     return true;
 }
 
-bool table_get(struct table *t, const char *key, char *out, size_t out_size)
+static bool get_locked(struct table *t, const char *key, char *out,
+                       size_t out_size)
 {
     struct entry *e = *find_link(t, key);
     if (e == NULL)
@@ -153,7 +166,7 @@ bool table_get(struct table *t, const char *key, char *out, size_t out_size)
     return true;
 }
 
-bool table_del(struct table *t, const char *key)
+static bool del_locked(struct table *t, const char *key)
 {
     struct entry **link = find_link(t, key);
     struct entry *e = *link;
@@ -163,4 +176,28 @@ bool table_del(struct table *t, const char *key)
     free_entry(e);
     t->count--;
     return true;
+}
+
+bool table_set(struct table *t, const char *key, const char *value)
+{
+    pthread_mutex_lock(&t->lock);
+    bool ok = set_locked(t, key, value);
+    pthread_mutex_unlock(&t->lock);
+    return ok;
+}
+
+bool table_get(struct table *t, const char *key, char *out, size_t out_size)
+{
+    pthread_mutex_lock(&t->lock);
+    bool found = get_locked(t, key, out, out_size);
+    pthread_mutex_unlock(&t->lock);
+    return found;
+}
+
+bool table_del(struct table *t, const char *key)
+{
+    pthread_mutex_lock(&t->lock);
+    bool found = del_locked(t, key);
+    pthread_mutex_unlock(&t->lock);
+    return found;
 }
