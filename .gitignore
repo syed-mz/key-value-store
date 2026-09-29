@@ -1,0 +1,9 @@
+# Build outputs
+*.o
+kvstore
+kvstore-debug
+kvstore-tsan
+*.dSYM/
+
+# Python
+__pycache__/

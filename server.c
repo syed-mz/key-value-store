@@ -51,6 +51,8 @@ struct server {
     struct worker workers[]; // flexible array member, sized at startup
 };
 
+// ---- Protocol -------------------------------------------------------------
+
 // Splits line on spaces, in place. Returns the token count, or max + 1 if
 // there are more than max tokens, so argv never overflows.
 static int split(char *line, char *argv[], int max)
@@ -103,6 +105,8 @@ static const char *execute(struct table *t, char *line, char *value_buf,
     }
     return "ERR unknown command";
 }
+
+// ---- Socket I/O -----------------------------------------------------------
 
 // write() may send fewer bytes than asked (e.g. when the socket's send
 // buffer is full), so keep going until everything is out.

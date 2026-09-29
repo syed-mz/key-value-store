@@ -22,6 +22,11 @@ table.o:  table.c table.h
 debug:
 	$(CC) $(CFLAGS) -O0 $(SANITIZE) -o kvstore-debug $(SRCS) $(LDFLAGS)
 
+# ThreadSanitizer finds data races. It can't be combined with ASan, so it
+# gets its own binary too.
+tsan:
+	$(CC) $(CFLAGS) -O1 -fsanitize=thread -o kvstore-tsan $(SRCS) $(LDFLAGS)
+
 test: kvstore
 	python3 test.py ./kvstore
 
@@ -31,6 +36,6 @@ leaks: kvstore
 	python3 test.py leaks --atExit -- ./kvstore
 
 clean:
-	rm -rf kvstore kvstore-debug kvstore-debug.dSYM $(OBJS)
+	rm -rf kvstore kvstore-debug kvstore-tsan *.dSYM $(OBJS)
 
-.PHONY: all debug test leaks clean
+.PHONY: all debug tsan test leaks clean
